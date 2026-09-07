@@ -63,7 +63,11 @@ Meshtastic firmware 2.7.26 has a bug where the position broadcast interval doesn
 
 During this process I unfortunately bricked one of the Pockets by flashing the wrong bootloader erase file. I turned a Raspberry Pi Pico into makeshift SWD programmer, which allowed me to flash the correct bootloader and then firmware back on, but that was an adventure.
 
-My first version of the RAIM detector used a ratio between the best and second best subset cost. It looked fine on paper and even worked on my one real field trial, but when I actually ran it through a few hundred simulated trials, it flagged honest anchors as spoofers 20 to 70 percent of the time depending on the threshold. Switched to an absolute cost threshold based on the actual measured noise level instead, which fixed it completely, zero false positives across 500 trials.
+My first version of the RAIM detector used a ratio between the best and second best subset cost. It looked fine on paper but when I started running simulated trials, it gave false positives 20 to 70 percent of the time depending on the threshold. I did a bunch of tests and swept the ratio threshold to see if there was an ideal setting but there was not.
+
+![Ratio threshold tradeoff, rejected approach](raim_threshold_sweep.png)
+
+False positives never drop below about 13 percent even at a threshold of 100, and by that time the detection is down to just 37 percent for a 50 meter lie. The problems was that when all four subsets are honest, their costs are all small, and the ratio between two small noisy numbers can still be large, and that large ratio would get flagged. Switching to an absolute cost threshold based on the measured noise level fixed it completely.
 
 RSSI is very noisy. I measured 5 to 9 dB of standard deviation at every distance I tested, which limits the accuracy of this kind of ranging. The next step up is time of flight or UWB ranging instead.
 
