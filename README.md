@@ -21,6 +21,7 @@ I placed radios at six different distances, from 10 to 160 meters, and logged si
 *measuring rssi strength at known distances*
 
 ![Path loss model](path_loss.png)
+
 *path loss model*
 
 Using that model, I ran a field trilateration test with 4 anchors spaced in a diamond about 40 meters apart, and a rover (the T-Deck radio) I moved to three different spots. The mean position error came out to 12.6 meters. The center position, which I verified with a rangefinder, landed at 3.8 meters. I also used a rangefinder to determine where i was for locations 2 and 3, but there is a certain amount of error in those measurements especially considering I was shooting a small bucket with a radio on top
