@@ -4,12 +4,12 @@ import scipy.optimize
 import matplotlib.pyplot as plt
 from itertools import combinations
 
-# path loss params from the calibration calculations, (see analyze.py)
+# path loss params from the calibration campaign (see analyze.py)
 A = -43.16
 n = 2.55
 
 # anchor layout from the field, converted to meters.
-# From_IDS: 5903 north, b12b east, 820e south, 85e4 west
+# from_ids: 5903 north, b12b east, 820e south, 85e4 west
 # assumes anchors are on exact cardinal bearings from center, which is roughly true
 anchor_ids = ['!f96f5903', '!05c8b12b', '!cae6820e', '!d1da85e4']
 anchor_names = ['North', 'East', 'South', 'West']
@@ -20,16 +20,20 @@ anchors = numpy.array([
     [-27.4, 0]
 ])
 
-# rover positions. verified via rangefinder but there is some degree of error in those measurements given that i was shooting a small bucket with a radio on top.
+# rover positions. position 1 was rangefinder-verified, 2 and 3 are paced estimates
 rover_windows = {
     'Position 1 (center)': ('19:54:00', '19:57:00', [0, 0]),
     'Position 2 (north, est.)': ('19:58:00', '20:00:30', [0, 15]),
     'Position 3 (SE, est.)': ('20:02:00', '20:05:00', [12, -12]),
 }
 
-# threshold for RAIM detection — if the best subset is this many times better than the second best, call it spoofing. 
-# without this the algorithm always flags somebody even when everyone's honest
-RAIM_THRESHOLD = 3.0
+# noise level from the field calibration (6dB RSSI std -> ~6m range std near this
+# distance). used to set absolute cost thresholds below, not a ratio between subsets.
+# a ratio-based threshold looked fine on paper but Monte Carlo testing showed 20-70%
+# false positives on honest data, so this version uses the actual noise scale instead.
+SIGMA_R = 6.0
+CLEAN_CEILING = 4 * SIGMA_R**2   # a subset this close to zero residual is "clean"
+DIRTY_FLOOR = 15 * SIGMA_R**2    # every other subset has to be clearly worse than this
 
 def estimate_range(rssi):
     # inverse of the path loss model
@@ -44,7 +48,7 @@ def distance_cost(candidate, anchors, ranges):
 
 def get_ranges(start, end):
     rssi_by_anchor = {aid: [] for aid in anchor_ids}
-    with open('trilatlog.csv', 'r') as f:
+    with open('data/trilatlog.csv', 'r') as f:
         reader = csv.reader(f)
         next(reader)
         for row in reader:
@@ -63,28 +67,21 @@ def trilaterate(anchors, ranges):
     return result.x, result.fun
 
 def raim(anchors, ranges):
-    # trilaterate with every 3-of-4 subset. the subset that excludes the liar
-    # has three honest anchors that agree, so it has the lowest cost.
-    # only flag if that subset is clearly better than the rest.
+    # try every 3-of-4 subset. the subset excluding the liar has three honest
+    # anchors that agree, so its cost stays near the noise floor. every subset
+    # that includes the liar gets dragged off and its cost blows up.
     subsets = list(combinations(range(4), 3))
-    costs = []
-    fixes = []
-    excluded = []
+    costs, fixes, excluded = [], [], []
     for subset in subsets:
         fix, cost = trilaterate(anchors[list(subset)], ranges[list(subset)])
-        exc = [i for i in range(4) if i not in subset][0]
         costs.append(cost)
         fixes.append(fix)
-        excluded.append(exc)
-    
-    sorted_costs = sorted(costs)
-    ratio = sorted_costs[1] / sorted_costs[0]
+        excluded.append([i for i in range(4) if i not in subset][0])
     best = numpy.argmin(costs)
-    
-    if ratio > RAIM_THRESHOLD:
-        return fixes[best], excluded[best], costs, ratio
-    else:
-        return fixes[best], None, costs, ratio
+    others = [c for i, c in enumerate(costs) if i != best]
+    if costs[best] < CLEAN_CEILING and min(others) > DIRTY_FLOOR:
+        return excluded[best], fixes[best], costs
+    return None, fixes[best], costs
 
 
 # ---- trilateration on real data ----
@@ -119,16 +116,18 @@ print(f"\nmean error: {numpy.mean(errors):.1f}m")
 
 
 # ---- RAIM on real RSSI ----
-# the spoofed positions here are applied in post-processing. the RSSI is real but the fake anchor position is typed in, not captured from a position packet.
-# RSSI doesn't change when a node lies about its GPS so this is mathematically the same as an over-the-air spoof, but it's not the full end-to-end demo.
-print("\n--- RAIM (real RSSI from Position 1, spoof applied in post) ----")
+# spoofed position is applied here in post-processing, not captured from a live
+# position packet over the mesh (the logger only recorded RSSI). RSSI doesn't
+# change when a node lies about its GPS, so the math is the same as an over-the-air
+# spoof, but this isn't the full end-to-end demo yet.
+print("\n--- RAIM (real RSSI from Position 1, spoof applied in post) ---")
 ranges = get_ranges('19:54:00', '19:57:00')
 
 print("\nbaseline, everyone honest:")
-fix, suspect, costs, ratio = raim(anchors, ranges)
-print(f"  costs: {[f'{c:.1f}' for c in costs]}  ratio={ratio:.2f}")
+suspect, fix, costs = raim(anchors, ranges)
+print(f"  costs: {[f'{c:.1f}' for c in costs]}")
 if suspect is None:
-    print(f"  no spoofing detected (ratio below {RAIM_THRESHOLD})")
+    print("  no spoofing detected (correct)")
 else:
     print(f"  FALSE POSITIVE: flagged {anchor_names[suspect]}")
 
@@ -136,11 +135,11 @@ for spoof_dist in [25, 50, 100, 200]:
     print(f"\nnorth anchor lies by {spoof_dist}m:")
     spoofed = anchors.copy()
     spoofed[0] = anchors[0] + [spoof_dist, 0]
-    fix, suspect, costs, ratio = raim(spoofed, ranges)
-    print(f"  costs: {[f'{c:.1f}' for c in costs]}  ratio={ratio:.2f}")
+    suspect, fix, costs = raim(spoofed, ranges)
+    print(f"  costs: {[f'{c:.1f}' for c in costs]}")
     if suspect == 0:
-        print(f"  DETECTED — flagged North")
+        print("  DETECTED — flagged North")
     elif suspect is None:
-        print(f"  MISSED — ratio below threshold")
+        print("  MISSED — below detection threshold")
     else:
         print(f"  WRONG — flagged {anchor_names[suspect]}")
