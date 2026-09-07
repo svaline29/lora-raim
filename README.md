@@ -18,8 +18,11 @@ The tricky part is deciding how far off is too far off before you actually call 
 I placed radios at six different distances, from 10 to 160 meters, and logged signal strength at each one. I fit a log-distance path loss model to that data to give me a way to convert RSSI into a distance estimate. The model is accurate to about 12% mean error across that whole range.
 
 ![Path loss calibration](images/field_ranging_setup.jpeg)
+
 *path loss calibration*
+
 ![Path loss model](path_loss.png)
+
 *path loss model*
 
 Using that model, I ran a field trilateration test with 4 anchors spaced in a diamond about 40 meters apart, and a rover (the T-Deck radio) I moved to three different spots. The mean position error came out to 12.6 meters. The center position, which I verified with a rangefinder, landed at 3.8 meters. I also used a rangefinder to determine where i was for locations 2 and 3, but there is a certain amount of error in those measurements especially considering I was shooting a small bucket with a radio on top
@@ -40,6 +43,7 @@ For the spoofing test, I took RSSI data from the anchors and told the algorithm 
 RAIM spoofing detection correctly identifies a compromised anchor at 50m, 100m, and 200m lie magnitudes, using real RSSI measurements and a detection threshold that gives a 0% false positive rate on honest anchors across 500 simulated trials.
 
 ![RAIM detection](raim_detection.png)
+
 *RAIM detection*
 
 ## Hardware
