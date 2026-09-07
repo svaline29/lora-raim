@@ -15,7 +15,7 @@ data = {
     160: [],
 }
 
-with open ('log.csv', 'r') as f:
+with open ('data/ranginglog.csv', 'r') as f:
     reader = csv.reader(f)
     header = next(reader)
 

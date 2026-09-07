@@ -6,8 +6,8 @@ import os
 import csv
 from pubsub import pub
 
-if not os.path.exists('log.csv'):
-    with open('log.csv', 'w') as f:
+if not os.path.exists('trilatlog.csv'):
+    with open('trilatlog.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerow(['timestamp', 'from_id', 'rssi', 'snr', 'portnum'])
 
@@ -22,7 +22,7 @@ def onReceive(packet, interface):
 
         print(f"{portnum} | {from_id} | RSSI={rssi} SNR={snr}")
 
-        with open('log.csv', 'a') as f:
+        with open('trilatlog.csv', 'a') as f:
             writer = csv.writer(f)
             writer.writerow([timestamp, from_id, rssi, snr, portnum])
 
