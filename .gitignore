@@ -1,5 +1,4 @@
 venv/
 *.csv
 __pycache__/
-README.md
 Oldlog.csv
