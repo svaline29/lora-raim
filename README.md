@@ -3,6 +3,7 @@
 A 5-node LoRa mesh that locates a radio with no GPS, using only the signal strength it hears from 4 known anchors. It also detects when one of those anchors is lying about its own position by checking whether the geometry stays consistent across every possible subset of them.
 
 ![Rover in the field](images/tdeck_logger.jpeg)
+*Rover and logger in the field*
 
 ## What it actually does
 
@@ -17,11 +18,14 @@ The tricky part is deciding how far off is too far off before you actually call 
 I placed radios at six different distances, from 10 to 160 meters, and logged signal strength at each one. I fit a log-distance path loss model to that data to give me a way to convert RSSI into a distance estimate. The model is accurate to about 12% mean error across that whole range.
 
 ![Path loss calibration](images/field_ranging_setup.jpeg)
+*path loss calibration*
 ![Path loss model](path_loss.png)
+*path loss model*
 
 Using that model, I ran a field trilateration test with 4 anchors spaced in a diamond about 40 meters apart, and a rover (the T-Deck radio) I moved to three different spots. The mean position error came out to 12.6 meters. The center position, which I verified with a rangefinder, landed at 3.8 meters. I also used a rangefinder to determine where i was for locations 2 and 3, but there is a certain amount of error in those measurements especially considering I was shooting a small bucket with a radio on top
 
 ![Trilateration results](trilateration_field.png)
+*Trilateration results*
 
 For the spoofing test, I took RSSI data from the anchors and told the algorithm one of them was somewhere it wasn't, at four different lie sizes. It correctly flagged no liars when all locations were real, missed a 25 meter lie (which is inside the noise floor of the RSSI measurements, so that checks out), and caught all spoofs of 50 meters plus.
 
@@ -36,6 +40,7 @@ For the spoofing test, I took RSSI data from the anchors and told the algorithm 
 RAIM spoofing detection correctly identifies a compromised anchor at 50m, 100m, and 200m lie magnitudes, using real RSSI measurements and a detection threshold that gives a 0% false positive rate on honest anchors across 500 simulated trials.
 
 ![RAIM detection](raim_detection.png)
+*RAIM detection*
 
 ## Hardware
 
@@ -50,6 +55,7 @@ The project is built around SX1262 LoRa radios, with nRF52840 or ESP32-S3 boards
 `logger.py` connects to a LoRa radio over serial and subscribes to incoming packets through the Meshtastic Python API. Every time a packet comes in with signal strength and signal to noise info attached, it gets written to a CSV.
 
 ![Logger running in the field](images/logger_close.jpeg)
+*Logger running in the field*
 
 `analyze.py` reads the calibration data, averages RSSI at each distance, fits the path loss model with scipy's curve_fit, and plots the result.
 
@@ -66,6 +72,7 @@ During this process I unfortunately bricked one of the Pockets by flashing the w
 My first version of the RAIM detector used a ratio between the best and second best subset cost. It looked fine on paper but when I started running simulated trials, it gave false positives 20 to 70 percent of the time depending on the threshold. I did a bunch of tests and swept the ratio threshold to see if there was an ideal setting but there was not.
 
 ![Ratio threshold tradeoff, rejected approach](raim_threshold_sweep.png)
+*Ratio threshold sweep, (the rejected approach)*
 
 False positives never drop below about 13 percent even at a threshold of 100, and by that time the detection is down to just 37 percent for a 50 meter lie. The problems was that when all four subsets are honest, their costs are all small, and the ratio between two small noisy numbers can still be large, and that large ratio would get flagged. Switching to an absolute cost threshold based on the measured noise level fixed it completely.
 
